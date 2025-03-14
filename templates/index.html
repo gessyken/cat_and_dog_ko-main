@@ -7,29 +7,33 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     </head>
     <body>
+        <div class="container">
+            <div class="text-end mb-3">
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Déconnexion</a>
+            </div>
+            <!-- ...reste du contenu existant... -->
 
-        <h1>🐱🐶 Classification Chien ou Chat</h1>
+            <h1>🐱🐶 Classification Chien ou Chat</h1>
 
-        <form action="/result" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" id="file" accept="image/*">
-            <input type="submit" value="Valider">
-        </form>
+            <form action="/result" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" id="file" accept="image/*">
+                <input type="submit" value="Valider">
+            </form>
 
-        {% if result %}
-            <p>Prédiction : {{ result }}</p>
+            {% if result %}
+                <p>Prédiction : {{ result }}</p>
 
-            <img src="data:image/png;base64,{{ image_base64_front }}" alt="">
+                <img src="data:image/png;base64,{{ image_base64_front }}" alt="">
 
-            <button>Rejeter la prédiction</button>
-            <button>Valider la prédiction</button>
-        {% else %}
-        {% endif %}
-
-
+                <button>Rejeter la prédiction</button>
+                <button>Valider la prédiction</button>
+            {% else %}
+            {% endif %}
+        </div>
     </body>
 </html>
 
- 
+
 
 
 
