@@ -1,4 +1,5 @@
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, session
+from functools import wraps
 import numpy as np
 from keras.models import load_model
 import os
@@ -9,7 +10,7 @@ import mlflow
 from datetime import datetime
 from keras import backend as K
 import keras
-from models import db, Feedback
+from models import db, Feedback, User
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from keras.preprocessing import image
@@ -24,11 +25,13 @@ MAX_IMG = 4000
 # Configurer MLflow
 mlflow.set_tracking_uri(
     "http://127.0.0.0:5001"
+    
 )  # mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./artifacts --host 127.0.0.1 --port 5001
 mlflow.set_experiment("feedback_experiment")
 
 app = Flask(__name__)
 app.secret_key = "une_clé_secrète_pour_session_et_flash"
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre_clé_secrète_par_défaut')
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///feedback.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -124,12 +127,69 @@ def retrain_model():
     mlflow.end_run()
 
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Veuillez vous connecter pour accéder à cette page.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            flash('Connexion réussie!', 'success')
+            return redirect(url_for('home'))
+        
+        flash('Nom d\'utilisateur ou mot de passe incorrect', 'error')
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if User.query.filter_by(username=username).first():
+            flash('Ce nom d\'utilisateur existe déjà', 'error')
+            return render_template('register.html')
+        
+        if User.query.filter_by(email=email).first():
+            flash('Cet email est déjà utilisé', 'error')
+            return render_template('register.html')
+        
+        user = User(username=username, email=email)
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('Inscription réussie! Vous pouvez maintenant vous connecter.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    flash('Vous êtes déconnecté.', 'info')
+    return redirect(url_for('login'))
+
 @app.route("/", methods=["GET"])
+@login_required
 def home():
     return render_template("index.html")
 
-
 @app.route("/result", methods=["POST"])
+@login_required
 def upload():
     if "file" not in request.files:
         flash("Aucun fichier envoyé.", "error")
